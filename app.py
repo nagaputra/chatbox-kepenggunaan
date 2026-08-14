@@ -45,7 +45,7 @@ if user_input := st.chat_input("Tanya soalan anda di sini..."):
         with st.chat_message("assistant"):
             message_placeholder = st.empty()
             
-            # Format step_list untuk Interactions API
+            # Format steps
             steps = []
             for m in st.session_state.messages:
                 author = "USER" if m["role"] == "user" else "MODEL"
@@ -56,11 +56,12 @@ if user_input := st.chat_input("Tanya soalan anda di sini..."):
                     }
                 })
 
-            # System instruction dihantar sebagai string secara terus
+            # Payload dengan 'type' yang tepat
             payload = {
                 "model": "gemini-3.7-flash",
                 "system_instruction": SYSTEM_INSTRUCTION.strip(),
                 "input": {
+                    "type": "step_list",
                     "step_list": {
                         "steps": steps
                     }
