@@ -55,7 +55,7 @@ if user_input := st.chat_input("Tanya soalan anda di sini..."):
                 })
 
             payload = {
-                "model": "gemini-3-flash",
+                "model": "gemini-3.7-flash",
                 "system_instruction": SYSTEM_INSTRUCTION,
                 "input": turns
             }
