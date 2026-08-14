@@ -49,38 +49,33 @@ if user_input := st.chat_input("Tanya soalan anda di sini..."):
             with st.chat_message("assistant"):
                 message_placeholder = st.empty()
                 
+                # Format perbualan
                 contents = []
                 for m in st.session_state.messages:
                     role = "user" if m["role"] == "user" else "model"
                     contents.append(types.Content(role=role, parts=[types.Part.from_text(text=m["content"])]))
 
-                # Senarai model yang disokong secara tertib
-                candidate_models = ['gemini-3-flash', 'gemini-3.1-flash', 'gemini-2.5-flash-preview', 'gemini-flash']
+                # Cari model yang sah secara automatik dari akaun API anda
+                available_models = [m.name for m in client.models.list() if "generateContent" in (m.supported_actions or [])]
                 
-                bot_reply = None
-                last_error = None
-                
-                for target_model in candidate_models:
-                    try:
-                        response = client.models.generate_content(
-                            model=target_model,
-                            contents=contents,
-                            config=types.GenerateContentConfig(
-                                system_instruction=SYSTEM_INSTRUCTION,
-                                temperature=0.7,
-                            )
+                # Utamakan model flash jika ada
+                chosen_model = next((m for m in available_models if "flash" in m.lower()), available_models[0] if available_models else None)
+
+                if not chosen_model:
+                    st.error("Tiada model penjanaan teks dijumpai untuk API Key ini.")
+                else:
+                    response = client.models.generate_content(
+                        model=chosen_model,
+                        contents=contents,
+                        config=types.GenerateContentConfig(
+                            system_instruction=SYSTEM_INSTRUCTION,
+                            temperature=0.7,
                         )
-                        bot_reply = response.text
-                        break
-                    except Exception as err:
-                        last_error = err
-                        continue
-                
-                if bot_reply:
+                    )
+                    
+                    bot_reply = response.text
                     message_placeholder.markdown(bot_reply)
                     st.session_state.messages.append({"role": "assistant", "content": bot_reply})
-                else:
-                    st.error(f"Ralat sambungan model: {last_error}")
 
         except Exception as e:
             st.error(f"Ralat berlaku: {e}")
