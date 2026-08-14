@@ -56,11 +56,10 @@ if user_input := st.chat_input("Tanya soalan anda di sini..."):
                     }
                 })
 
+            # System instruction dihantar sebagai string secara terus
             payload = {
                 "model": "gemini-3.7-flash",
-                "system_instruction": {
-                    "parts": [{"text": SYSTEM_INSTRUCTION}]
-                },
+                "system_instruction": SYSTEM_INSTRUCTION.strip(),
                 "input": {
                     "step_list": {
                         "steps": steps
