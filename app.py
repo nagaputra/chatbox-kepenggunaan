@@ -1,6 +1,5 @@
 import streamlit as st
-from google import genai
-from google.genai import types
+import requests
 
 # Tetapan Halaman Web
 st.set_page_config(page_title="Pembantu Kepenggunaan & Gaya Hidup AI", page_icon="🛍️")
@@ -29,7 +28,7 @@ Gaya jawapan:
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Paparkan mesej lama
+# Paparkan mesej terdahulu
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
@@ -43,39 +42,41 @@ if user_input := st.chat_input("Tanya soalan anda di sini..."):
         with st.chat_message("user"):
             st.markdown(user_input)
 
-        try:
-            client = genai.Client(api_key=api_key)
+        with st.chat_message("assistant"):
+            message_placeholder = st.empty()
             
-            with st.chat_message("assistant"):
-                message_placeholder = st.empty()
-                
-                # Format perbualan
-                contents = []
-                for m in st.session_state.messages:
-                    role = "user" if m["role"] == "user" else "model"
-                    contents.append(types.Content(role=role, parts=[types.Part.from_text(text=m["content"])]))
+            # Format perbualan untuk Gemini REST API
+            formatted_contents = []
+            for m in st.session_state.messages:
+                role = "user" if m["role"] == "user" else "model"
+                formatted_contents.append({
+                    "role": role,
+                    "parts": [{"text": m["content"]}]
+                })
 
-                # Cari model yang sah secara automatik dari akaun API anda
-                available_models = [m.name for m in client.models.list() if "generateContent" in (m.supported_actions or [])]
-                
-                # Utamakan model flash jika ada
-                chosen_model = next((m for m in available_models if "flash" in m.lower()), available_models[0] if available_models else None)
+            payload = {
+                "system_instruction": {
+                    "parts": [{"text": SYSTEM_INSTRUCTION}]
+                },
+                "contents": formatted_contents,
+                "generationConfig": {
+                    "temperature": 0.7
+                }
+            }
 
-                if not chosen_model:
-                    st.error("Tiada model penjanaan teks dijumpai untuk API Key ini.")
-                else:
-                    response = client.models.generate_content(
-                        model=chosen_model,
-                        contents=contents,
-                        config=types.GenerateContentConfig(
-                            system_instruction=SYSTEM_INSTRUCTION,
-                            temperature=0.7,
-                        )
-                    )
-                    
-                    bot_reply = response.text
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key.strip()}"
+
+            try:
+                response = requests.post(url, json=payload)
+                data = response.json()
+
+                if response.status_code == 200 and "candidates" in data:
+                    bot_reply = data["candidates"][0]["content"]["parts"][0]["text"]
                     message_placeholder.markdown(bot_reply)
                     st.session_state.messages.append({"role": "assistant", "content": bot_reply})
+                else:
+                    error_msg = data.get("error", {}).get("message", "Gagal menghubungi Gemini API.")
+                    st.error(f"Ralat API ({response.status_code}): {error_msg}")
 
-        except Exception as e:
-            st.error(f"Ralat berlaku: {e}")
+            except Exception as e:
+                st.error(f"Ralat Sambungan: {e}")
