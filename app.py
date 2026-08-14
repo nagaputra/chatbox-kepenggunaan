@@ -46,9 +46,15 @@ if user_input := st.chat_input("Tanya soalan anda di sini..."):
         with st.chat_message("assistant"):
             message_placeholder = st.empty()
             
-            # Model generasi terkini yang sah sahaja
-            models_to_try = ["gemini-3.7-flash", "gemini-3.7-pro"]
-            
+            payload = {
+                "model": "gemini-3.7-flash",
+                "system_instruction": SYSTEM_INSTRUCTION.strip(),
+                "input": {
+                    "type": "text",
+                    "text": user_input
+                }
+            }
+
             headers = {
                 "Content-Type": "application/json",
                 "x-goog-api-key": api_key.strip()
@@ -58,46 +64,33 @@ if user_input := st.chat_input("Tanya soalan anda di sini..."):
             bot_reply = ""
             error_details = ""
 
-            for model_name in models_to_try:
-                payload = {
-                    "model": model_name,
-                    "system_instruction": SYSTEM_INSTRUCTION.strip(),
-                    "input": {
-                        "type": "text",
-                        "text": user_input
-                    }
-                }
+            # Cuba sehingga 3 kali jika berlaku trafik tinggi (500)
+            for attempt in range(3):
+                try:
+                    response = requests.post(url, headers=headers, json=payload)
+                    data = response.json()
 
-                # Cuba sehingga 2 kali sekiranya pelayan sibuk (500)
-                for attempt in range(2):
-                    try:
-                        response = requests.post(url, headers=headers, json=payload)
-                        data = response.json()
+                    if response.status_code == 200:
+                        if "outputs" in data and len(data["outputs"]) > 0:
+                            for output in data["outputs"]:
+                                if output.get("type") == "text" and "text" in output:
+                                    bot_reply += output["text"]
+                                elif "text" in output:
+                                    bot_reply += output["text"]
+                        elif "text" in data:
+                            bot_reply = data["text"]
 
-                        if response.status_code == 200:
-                            if "outputs" in data and len(data["outputs"]) > 0:
-                                for output in data["outputs"]:
-                                    if output.get("type") == "text" and "text" in output:
-                                        bot_reply += output["text"]
-                                    elif "text" in output:
-                                        bot_reply += output["text"]
-                            elif "text" in data:
-                                bot_reply = data["text"]
-
-                            if bot_reply:
-                                break
-                        elif response.status_code == 500:
-                            # Jika 500 (high demand), rehat 1.5 saat dan cuba lagi
-                            time.sleep(1.5)
-                            continue
-                        else:
-                            error_details = data.get("error", {}).get("message", f"Status {response.status_code}")
+                        if bot_reply:
                             break
-                    except Exception as e:
-                        error_details = str(e)
+                    elif response.status_code == 500:
+                        # Trafik tinggi, tunggu 2 saat dan cuba semula
+                        time.sleep(2)
+                        continue
+                    else:
+                        error_details = data.get("error", {}).get("message", f"Status {response.status_code}")
                         break
-
-                if bot_reply:
+                except Exception as e:
+                    error_details = str(e)
                     break
 
             if bot_reply:
