@@ -45,26 +45,13 @@ if user_input := st.chat_input("Tanya soalan anda di sini..."):
         with st.chat_message("assistant"):
             message_placeholder = st.empty()
             
-            # Format steps
-            steps = []
-            for m in st.session_state.messages:
-                author = "USER" if m["role"] == "user" else "MODEL"
-                steps.append({
-                    "author": author,
-                    "content": {
-                        "parts": [{"text": m["content"]}]
-                    }
-                })
-
-            # Payload dengan 'type' yang tepat
+            # Format payload mengikut schema type 'text'
             payload = {
                 "model": "gemini-3.7-flash",
                 "system_instruction": SYSTEM_INSTRUCTION.strip(),
                 "input": {
-                    "type": "step_list",
-                    "step_list": {
-                        "steps": steps
-                    }
+                    "type": "text",
+                    "text": user_input
                 }
             }
 
@@ -81,12 +68,13 @@ if user_input := st.chat_input("Tanya soalan anda di sini..."):
 
                 if response.status_code == 200:
                     bot_reply = ""
+                    # Semak teks dalam struktur respon Interactions API
                     if "outputs" in data and len(data["outputs"]) > 0:
-                        last_output = data["outputs"][-1]
-                        if "content" in last_output and "parts" in last_output["content"]:
-                            bot_reply = last_output["content"]["parts"][0].get("text", "")
-                        elif "text" in last_output:
-                            bot_reply = last_output.get("text", "")
+                        for output in data["outputs"]:
+                            if output.get("type") == "text" and "text" in output:
+                                bot_reply += output["text"]
+                            elif "text" in output:
+                                bot_reply += output["text"]
                     elif "text" in data:
                         bot_reply = data["text"]
 
