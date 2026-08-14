@@ -46,8 +46,8 @@ if user_input := st.chat_input("Tanya soalan anda di sini..."):
         with st.chat_message("assistant"):
             message_placeholder = st.empty()
             
-            # Senarai model untuk dicuba secara berturut-turut jika ada yang sibuk (500)
-            models_to_try = ["gemini-3.7-flash", "gemini-2.5-flash", "gemini-2.5-pro"]
+            # Model generasi terkini yang sah sahaja
+            models_to_try = ["gemini-3.7-flash", "gemini-3.7-pro"]
             
             headers = {
                 "Content-Type": "application/json",
@@ -68,30 +68,40 @@ if user_input := st.chat_input("Tanya soalan anda di sini..."):
                     }
                 }
 
-                try:
-                    response = requests.post(url, headers=headers, json=payload)
-                    data = response.json()
+                # Cuba sehingga 2 kali sekiranya pelayan sibuk (500)
+                for attempt in range(2):
+                    try:
+                        response = requests.post(url, headers=headers, json=payload)
+                        data = response.json()
 
-                    if response.status_code == 200:
-                        if "outputs" in data and len(data["outputs"]) > 0:
-                            for output in data["outputs"]:
-                                if output.get("type") == "text" and "text" in output:
-                                    bot_reply += output["text"]
-                                elif "text" in output:
-                                    bot_reply += output["text"]
-                        elif "text" in data:
-                            bot_reply = data["text"]
+                        if response.status_code == 200:
+                            if "outputs" in data and len(data["outputs"]) > 0:
+                                for output in data["outputs"]:
+                                    if output.get("type") == "text" and "text" in output:
+                                        bot_reply += output["text"]
+                                    elif "text" in output:
+                                        bot_reply += output["text"]
+                            elif "text" in data:
+                                bot_reply = data["text"]
 
-                        if bot_reply:
-                            break  # Berjaya dapat respon, berhenti mencuba
-                    else:
-                        error_details = data.get("error", {}).get("message", f"Ralat status {response.status_code}")
-                        time.sleep(1)  # Tunggu sebentar sebelum cuba model seterusnya
-                except Exception as e:
-                    error_details = str(e)
+                            if bot_reply:
+                                break
+                        elif response.status_code == 500:
+                            # Jika 500 (high demand), rehat 1.5 saat dan cuba lagi
+                            time.sleep(1.5)
+                            continue
+                        else:
+                            error_details = data.get("error", {}).get("message", f"Status {response.status_code}")
+                            break
+                    except Exception as e:
+                        error_details = str(e)
+                        break
+
+                if bot_reply:
+                    break
 
             if bot_reply:
                 message_placeholder.markdown(bot_reply)
                 st.session_state.messages.append({"role": "assistant", "content": bot_reply})
             else:
-                st.error(f"Pelayan AI sedang mengalami trafik tinggi. Sila cuba hantar semula soalan anda dalam beberapa saat. ({error_details})")
+                st.error(f"Gagal memproses permintaan: {error_details}")
