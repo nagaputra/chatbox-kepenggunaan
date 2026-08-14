@@ -1,5 +1,6 @@
 import streamlit as st
 import requests
+import time
 
 # Tetapan Halaman Web
 st.set_page_config(page_title="Pembantu Kepenggunaan & Gaya Hidup AI", page_icon="🛍️")
@@ -44,58 +45,56 @@ if user_input := st.chat_input("Tanya soalan anda di sini..."):
 
         with st.chat_message("assistant"):
             message_placeholder = st.empty()
-            clean_key = api_key.strip()
+            
+            payload = {
+                "model": "gemini-3.7-flash",
+                "system_instruction": SYSTEM_INSTRUCTION.strip(),
+                "input": {
+                    "type": "text",
+                    "text": user_input
+                }
+            }
 
-            try:
-                # 1. Dapatkan senarai model sah secara terus dari akaun API anda
-                list_url = f"https://generativelanguage.googleapis.com/v1beta/models?key={clean_key}"
-                list_res = requests.get(list_url)
-                list_data = list_res.json()
+            headers = {
+                "Content-Type": "application/json",
+                "x-goog-api-key": api_key.strip()
+            }
+            url = "https://generativelanguage.googleapis.com/v1beta/interactions"
 
-                if "models" not in list_data:
-                    err_txt = list_data.get("error", {}).get("message", "API Key tidak sah atau kuota tamat.")
-                    st.error(f"Ralat Pengesahan API: {err_txt}")
-                else:
-                    # Pilih model yang menyokong generateContent
-                    supported = [m["name"] for m in list_data["models"] if "generateContent" in m.get("supportedGenerationMethods", [])]
-                    
-                    # Utamakan model flash
-                    target_model = next((m for m in supported if "flash" in m.lower()), supported[0] if supported else None)
+            bot_reply = ""
+            last_error_message = ""
 
-                    if not target_model:
-                        st.error("Tiada model penjanaan yang aktif pada API Key ini.")
+            # Cuba sehingga 4 kali dengan jeda masa bertingkat jika berlaku trafik tinggi (500)
+            for attempt in range(4):
+                try:
+                    response = requests.post(url, headers=headers, json=payload, timeout=30)
+                    data = response.json()
+
+                    if response.status_code == 200:
+                        if "outputs" in data and len(data["outputs"]) > 0:
+                            for output in data["outputs"]:
+                                if output.get("type") == "text" and "text" in output:
+                                    bot_reply += output["text"]
+                                elif "text" in output:
+                                    bot_reply += output["text"]
+                        elif "text" in data:
+                            bot_reply = data["text"]
+
+                        if bot_reply:
+                            break
+                    elif response.status_code in [500, 503]:
+                        # Trafik pelayan tinggi, tunggu sebentar dan cuba semula
+                        time.sleep(2 * (attempt + 1))
+                        continue
                     else:
-                        # 2. Hantar permintaan perbualan kepada model yang dipilih
-                        # Format contents
-                        contents = []
-                        for m in st.session_state.messages:
-                            role = "user" if m["role"] == "user" else "model"
-                            contents.append({
-                                "role": role,
-                                "parts": [{"text": m["content"]}]
-                            })
+                        last_error_message = data.get("error", {}).get("message", f"Status {response.status_code}")
+                        break
+                except Exception as e:
+                    last_error_message = str(e)
+                    time.sleep(2)
 
-                        gen_url = f"https://generativelanguage.googleapis.com/v1beta/{target_model}:generateContent?key={clean_key}"
-                        payload = {
-                            "system_instruction": {
-                                "parts": [{"text": SYSTEM_INSTRUCTION.strip()}]
-                            },
-                            "contents": contents,
-                            "generationConfig": {
-                                "temperature": 0.7
-                            }
-                        }
-
-                        gen_res = requests.post(gen_url, json=payload)
-                        gen_data = gen_res.json()
-
-                        if gen_res.status_code == 200 and "candidates" in gen_data:
-                            bot_reply = gen_data["candidates"][0]["content"]["parts"][0]["text"]
-                            message_placeholder.markdown(bot_reply)
-                            st.session_state.messages.append({"role": "assistant", "content": bot_reply})
-                        else:
-                            err_txt = gen_data.get("error", {}).get("message", str(gen_data))
-                            st.error(f"Ralat Menjana Jawapan ({gen_res.status_code}): {err_txt}")
-
-            except Exception as e:
-                st.error(f"Ralat Sambungan: {e}")
+            if bot_reply:
+                message_placeholder.markdown(bot_reply)
+                st.session_state.messages.append({"role": "assistant", "content": bot_reply})
+            else:
+                st.error(f"Gagal memproses permintaan AI: {last_error_message}")
