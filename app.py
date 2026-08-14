@@ -45,37 +45,49 @@ if user_input := st.chat_input("Tanya soalan anda di sini..."):
         with st.chat_message("assistant"):
             message_placeholder = st.empty()
             
-            # Format perbualan untuk Gemini REST API
-            formatted_contents = []
+            # Format input sejarah perbualan untuk Interactions API
+            turns = []
             for m in st.session_state.messages:
                 role = "user" if m["role"] == "user" else "model"
-                formatted_contents.append({
+                turns.append({
                     "role": role,
-                    "parts": [{"text": m["content"]}]
+                    "content": m["content"]
                 })
 
             payload = {
-                "system_instruction": {
-                    "parts": [{"text": SYSTEM_INSTRUCTION}]
-                },
-                "contents": formatted_contents,
-                "generationConfig": {
-                    "temperature": 0.7
-                }
+                "model": "gemini-3-flash",
+                "system_instruction": SYSTEM_INSTRUCTION,
+                "input": turns
             }
 
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key.strip()}"
+            headers = {
+                "Content-Type": "application/json",
+                "x-goog-api-key": api_key.strip()
+            }
+
+            url = "https://generativelanguage.googleapis.com/v1beta/interactions"
 
             try:
-                response = requests.post(url, json=payload)
+                response = requests.post(url, headers=headers, json=payload)
                 data = response.json()
 
-                if response.status_code == 200 and "candidates" in data:
-                    bot_reply = data["candidates"][0]["content"]["parts"][0]["text"]
-                    message_placeholder.markdown(bot_reply)
-                    st.session_state.messages.append({"role": "assistant", "content": bot_reply})
+                if response.status_code == 200:
+                    # Dapatkan teks respon daripada struktur Interactions API
+                    bot_reply = ""
+                    if "outputs" in data and len(data["outputs"]) > 0:
+                        bot_reply = data["outputs"][-1].get("text", "")
+                    elif "text" in data:
+                        bot_reply = data["text"]
+                    elif "response" in data:
+                        bot_reply = str(data["response"])
+
+                    if bot_reply:
+                        message_placeholder.markdown(bot_reply)
+                        st.session_state.messages.append({"role": "assistant", "content": bot_reply})
+                    else:
+                        st.write(data)
                 else:
-                    error_msg = data.get("error", {}).get("message", "Gagal menghubungi Gemini API.")
+                    error_msg = data.get("error", {}).get("message", "Gagal menghubungi Gemini Interactions API.")
                     st.error(f"Ralat API ({response.status_code}): {error_msg}")
 
             except Exception as e:
