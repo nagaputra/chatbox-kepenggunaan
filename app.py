@@ -54,9 +54,9 @@ if user_input := st.chat_input("Tanya soalan anda di sini..."):
                     role = "user" if m["role"] == "user" else "model"
                     contents.append(types.Content(role=role, parts=[types.Part.from_text(text=m["content"])]))
 
-                # Menggunakan model gemini-2.0-flash yang sah
+                # Menggunakan model flash terkini
                 response = client.models.generate_content(
-                    model='gemini-2.0-flash',
+                    model='gemini-2.5-flash',
                     contents=contents,
                     config=types.GenerateContentConfig(
                         system_instruction=SYSTEM_INSTRUCTION,
