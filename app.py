@@ -28,7 +28,7 @@ Gaya jawapan:
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Paparkan mesej terdahulu
+# Paparkan mesej lama
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
@@ -45,19 +45,27 @@ if user_input := st.chat_input("Tanya soalan anda di sini..."):
         with st.chat_message("assistant"):
             message_placeholder = st.empty()
             
-            # Format input sejarah perbualan untuk Interactions API
-            turns = []
+            # Format step_list untuk Interactions API
+            steps = []
             for m in st.session_state.messages:
-                role = "user" if m["role"] == "user" else "model"
-                turns.append({
-                    "role": role,
-                    "content": m["content"]
+                author = "USER" if m["role"] == "user" else "MODEL"
+                steps.append({
+                    "author": author,
+                    "content": {
+                        "parts": [{"text": m["content"]}]
+                    }
                 })
 
             payload = {
                 "model": "gemini-3.7-flash",
-                "system_instruction": SYSTEM_INSTRUCTION,
-                "input": turns
+                "system_instruction": {
+                    "parts": [{"text": SYSTEM_INSTRUCTION}]
+                },
+                "input": {
+                    "step_list": {
+                        "steps": steps
+                    }
+                }
             }
 
             headers = {
@@ -72,14 +80,15 @@ if user_input := st.chat_input("Tanya soalan anda di sini..."):
                 data = response.json()
 
                 if response.status_code == 200:
-                    # Dapatkan teks respon daripada struktur Interactions API
                     bot_reply = ""
                     if "outputs" in data and len(data["outputs"]) > 0:
-                        bot_reply = data["outputs"][-1].get("text", "")
+                        last_output = data["outputs"][-1]
+                        if "content" in last_output and "parts" in last_output["content"]:
+                            bot_reply = last_output["content"]["parts"][0].get("text", "")
+                        elif "text" in last_output:
+                            bot_reply = last_output.get("text", "")
                     elif "text" in data:
                         bot_reply = data["text"]
-                    elif "response" in data:
-                        bot_reply = str(data["response"])
 
                     if bot_reply:
                         message_placeholder.markdown(bot_reply)
