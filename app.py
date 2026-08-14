@@ -54,19 +54,33 @@ if user_input := st.chat_input("Tanya soalan anda di sini..."):
                     role = "user" if m["role"] == "user" else "model"
                     contents.append(types.Content(role=role, parts=[types.Part.from_text(text=m["content"])]))
 
-                # Menggunakan model flash terkini
-                response = client.models.generate_content(
-                    model='gemini-2.5-flash',
-                    contents=contents,
-                    config=types.GenerateContentConfig(
-                        system_instruction=SYSTEM_INSTRUCTION,
-                        temperature=0.7,
-                    )
-                )
+                # Senarai model yang disokong secara tertib
+                candidate_models = ['gemini-3-flash', 'gemini-3.1-flash', 'gemini-2.5-flash-preview', 'gemini-flash']
                 
-                bot_reply = response.text
-                message_placeholder.markdown(bot_reply)
-                st.session_state.messages.append({"role": "assistant", "content": bot_reply})
+                bot_reply = None
+                last_error = None
+                
+                for target_model in candidate_models:
+                    try:
+                        response = client.models.generate_content(
+                            model=target_model,
+                            contents=contents,
+                            config=types.GenerateContentConfig(
+                                system_instruction=SYSTEM_INSTRUCTION,
+                                temperature=0.7,
+                            )
+                        )
+                        bot_reply = response.text
+                        break
+                    except Exception as err:
+                        last_error = err
+                        continue
+                
+                if bot_reply:
+                    message_placeholder.markdown(bot_reply)
+                    st.session_state.messages.append({"role": "assistant", "content": bot_reply})
+                else:
+                    st.error(f"Ralat sambungan model: {last_error}")
 
         except Exception as e:
             st.error(f"Ralat berlaku: {e}")
