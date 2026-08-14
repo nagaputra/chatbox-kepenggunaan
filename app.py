@@ -1,5 +1,6 @@
 import streamlit as st
 import requests
+import time
 
 # Tetapan Halaman Web
 st.set_page_config(page_title="Pembantu Kepenggunaan & Gaya Hidup AI", page_icon="🛍️")
@@ -45,47 +46,52 @@ if user_input := st.chat_input("Tanya soalan anda di sini..."):
         with st.chat_message("assistant"):
             message_placeholder = st.empty()
             
-            # Format payload mengikut schema type 'text'
-            payload = {
-                "model": "gemini-3.7-flash",
-                "system_instruction": SYSTEM_INSTRUCTION.strip(),
-                "input": {
-                    "type": "text",
-                    "text": user_input
-                }
-            }
-
+            # Senarai model untuk dicuba secara berturut-turut jika ada yang sibuk (500)
+            models_to_try = ["gemini-3.7-flash", "gemini-2.5-flash", "gemini-2.5-pro"]
+            
             headers = {
                 "Content-Type": "application/json",
                 "x-goog-api-key": api_key.strip()
             }
-
             url = "https://generativelanguage.googleapis.com/v1beta/interactions"
 
-            try:
-                response = requests.post(url, headers=headers, json=payload)
-                data = response.json()
+            bot_reply = ""
+            error_details = ""
 
-                if response.status_code == 200:
-                    bot_reply = ""
-                    # Semak teks dalam struktur respon Interactions API
-                    if "outputs" in data and len(data["outputs"]) > 0:
-                        for output in data["outputs"]:
-                            if output.get("type") == "text" and "text" in output:
-                                bot_reply += output["text"]
-                            elif "text" in output:
-                                bot_reply += output["text"]
-                    elif "text" in data:
-                        bot_reply = data["text"]
+            for model_name in models_to_try:
+                payload = {
+                    "model": model_name,
+                    "system_instruction": SYSTEM_INSTRUCTION.strip(),
+                    "input": {
+                        "type": "text",
+                        "text": user_input
+                    }
+                }
 
-                    if bot_reply:
-                        message_placeholder.markdown(bot_reply)
-                        st.session_state.messages.append({"role": "assistant", "content": bot_reply})
+                try:
+                    response = requests.post(url, headers=headers, json=payload)
+                    data = response.json()
+
+                    if response.status_code == 200:
+                        if "outputs" in data and len(data["outputs"]) > 0:
+                            for output in data["outputs"]:
+                                if output.get("type") == "text" and "text" in output:
+                                    bot_reply += output["text"]
+                                elif "text" in output:
+                                    bot_reply += output["text"]
+                        elif "text" in data:
+                            bot_reply = data["text"]
+
+                        if bot_reply:
+                            break  # Berjaya dapat respon, berhenti mencuba
                     else:
-                        st.write(data)
-                else:
-                    error_msg = data.get("error", {}).get("message", "Gagal menghubungi Gemini Interactions API.")
-                    st.error(f"Ralat API ({response.status_code}): {error_msg}")
+                        error_details = data.get("error", {}).get("message", f"Ralat status {response.status_code}")
+                        time.sleep(1)  # Tunggu sebentar sebelum cuba model seterusnya
+                except Exception as e:
+                    error_details = str(e)
 
-            except Exception as e:
-                st.error(f"Ralat Sambungan: {e}")
+            if bot_reply:
+                message_placeholder.markdown(bot_reply)
+                st.session_state.messages.append({"role": "assistant", "content": bot_reply})
+            else:
+                st.error(f"Pelayan AI sedang mengalami trafik tinggi. Sila cuba hantar semula soalan anda dalam beberapa saat. ({error_details})")
