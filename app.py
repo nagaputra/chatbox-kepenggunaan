@@ -1,4 +1,5 @@
 import streamlit as st
+import time
 from google import genai
 from google.genai import types
 
@@ -41,32 +42,43 @@ if user_input := st.chat_input("Tanya soalan anda di sini..."):
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
         
-        try:
-            client = genai.Client(api_key=API_KEY.strip())
-            
-            # Format perbualan
-            contents = []
-            for m in st.session_state.messages:
-                role = "user" if m["role"] == "user" else "model"
-                contents.append(types.Content(role=role, parts=[types.Part.from_text(text=m["content"])]))
+        # Format perbualan
+        contents = []
+        for m in st.session_state.messages:
+            role = "user" if m["role"] == "user" else "model"
+            contents.append(types.Content(role=role, parts=[types.Part.from_text(text=m["content"])]))
 
-            # Panggilan model gemini-3.7-flash
-            response = client.models.generate_content(
-                model="gemini-3.7-flash",
-                contents=contents,
-                config=types.GenerateContentConfig(
-                    system_instruction=SYSTEM_INSTRUCTION.strip(),
-                    temperature=0.7,
+        bot_reply = None
+        last_error = ""
+
+        # Auto-retry sehingga 3 kali jika server sibuk (503 / High demand)
+        for attempt in range(3):
+            try:
+                client = genai.Client(api_key=API_KEY.strip())
+                response = client.models.generate_content(
+                    model="gemini-3.7-flash",
+                    contents=contents,
+                    config=types.GenerateContentConfig(
+                        system_instruction=SYSTEM_INSTRUCTION.strip(),
+                        temperature=0.7,
+                    )
                 )
-            )
-            
-            bot_reply = response.text
+                bot_reply = response.text
+                break
+            except Exception as e:
+                err_str = str(e)
+                last_error = err_str
+                if "503" in err_str or "UNAVAILABLE" in err_str or "high demand" in err_str.lower():
+                    time.sleep(2 * (attempt + 1))
+                    continue
+                else:
+                    break
+
+        if bot_reply:
             message_placeholder.markdown(bot_reply)
             st.session_state.messages.append({"role": "assistant", "content": bot_reply})
-
-        except Exception as e:
-            err_str = str(e)
-            if "RESOURCE_EXHAUSTED" in err_str or "Quota exceeded" in err_str:
+        else:
+            if "RESOURCE_EXHAUSTED" in last_error or "Quota exceeded" in last_error:
                 st.warning("⏳ Had kuota percuma penuh seketika. Sila tunggu 1 minit dan cuba hantar soalan semula.")
             else:
-                st.error(f"Ralat sistem: {err_str}")
+                st.error(f"Ralat sistem: {last_error}")
