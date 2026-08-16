@@ -7,8 +7,10 @@ st.set_page_config(page_title="Pembantu Kepenggunaan & Gaya Hidup AI", page_icon
 st.title("🛍️ Pembantu Kepenggunaan & Gaya Hidup AI")
 st.write("Tanyakan soalan berkaitan hak pengguna, aduan KPDN/TTPM, cadangan makanan sihat, isu kesihatan, atau penipuan (scam).")
 
-# Input API Key di Sidebar
-api_key = st.sidebar.text_input("Masukkan Gemini API Key:", type="password")
+# ==========================================
+# API KEY DITANAM TERUS DI SINI
+# ==========================================
+API_KEY = "AQ.Ab8RN6LyUizjcjOm9BE8OoXMpUWJ-y8ey3bZxv5p3wVmuijl5Q"
 
 # Peranan & Panduan AI
 SYSTEM_INSTRUCTION = """
@@ -32,42 +34,39 @@ for msg in st.session_state.messages:
 
 # Input Pengguna
 if user_input := st.chat_input("Tanya soalan anda di sini..."):
-    if not api_key:
-        st.error("Sila masukkan Gemini API Key di bahagian menu sisi dahulu!")
-    else:
-        st.session_state.messages.append({"role": "user", "content": user_input})
-        with st.chat_message("user"):
-            st.markdown(user_input)
+    st.session_state.messages.append({"role": "user", "content": user_input})
+    with st.chat_message("user"):
+        st.markdown(user_input)
 
-        with st.chat_message("assistant"):
-            message_placeholder = st.empty()
+    with st.chat_message("assistant"):
+        message_placeholder = st.empty()
+        
+        try:
+            client = genai.Client(api_key=API_KEY.strip())
             
-            try:
-                client = genai.Client(api_key=api_key.strip())
-                
-                # Format sejarah perbualan
-                contents = []
-                for m in st.session_state.messages:
-                    role = "user" if m["role"] == "user" else "model"
-                    contents.append(types.Content(role=role, parts=[types.Part.from_text(text=m["content"])]))
+            # Format perbualan
+            contents = []
+            for m in st.session_state.messages:
+                role = "user" if m["role"] == "user" else "model"
+                contents.append(types.Content(role=role, parts=[types.Part.from_text(text=m["content"])]))
 
-                # Menggunakan model aktif
-                response = client.models.generate_content(
-                    model="gemini-3.7-flash",
-                    contents=contents,
-                    config=types.GenerateContentConfig(
-                        system_instruction=SYSTEM_INSTRUCTION.strip(),
-                        temperature=0.7,
-                    )
+            # Panggilan model gemini-3.7-flash
+            response = client.models.generate_content(
+                model="gemini-3.7-flash",
+                contents=contents,
+                config=types.GenerateContentConfig(
+                    system_instruction=SYSTEM_INSTRUCTION.strip(),
+                    temperature=0.7,
                 )
-                
-                bot_reply = response.text
-                message_placeholder.markdown(bot_reply)
-                st.session_state.messages.append({"role": "assistant", "content": bot_reply})
+            )
+            
+            bot_reply = response.text
+            message_placeholder.markdown(bot_reply)
+            st.session_state.messages.append({"role": "assistant", "content": bot_reply})
 
-            except Exception as e:
-                err_str = str(e)
-                if "RESOURCE_EXHAUSTED" in err_str or "Quota exceeded" in err_str:
-                    st.warning("⏳ Had kuota percuma penuh seketika. Sila tunggu 1 minit dan cuba hantar soalan semula.")
-                else:
-                    st.error(f"Ralat sistem: {err_str}")
+        except Exception as e:
+            err_str = str(e)
+            if "RESOURCE_EXHAUSTED" in err_str or "Quota exceeded" in err_str:
+                st.warning("⏳ Had kuota percuma penuh seketika. Sila tunggu 1 minit dan cuba hantar soalan semula.")
+            else:
+                st.error(f"Ralat sistem: {err_str}")
