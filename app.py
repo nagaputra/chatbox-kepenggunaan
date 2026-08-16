@@ -1,43 +1,34 @@
 import streamlit as st
-import requests
 import time
+from google import genai
+from google.genai import types
 
-# Tetapan Halaman Web
 st.set_page_config(page_title="Pembantu Kepenggunaan & Gaya Hidup AI", page_icon="🛍️")
 st.title("🛍️ Pembantu Kepenggunaan & Gaya Hidup AI")
 st.write("Tanyakan soalan berkaitan hak pengguna, aduan KPDN/TTPM, cadangan makanan sihat, isu kesihatan, atau penipuan (scam).")
 
-# Input API Key di Sidebar
 api_key = st.sidebar.text_input("Masukkan Gemini API Key:", type="password")
 
-# Peranan & Panduan AI
 SYSTEM_INSTRUCTION = """
 Anda ialah Pembantu AI Kepenggunaan dan Gaya Hidup Pintar di Malaysia.
-Tugas utama anda adalah membantu pengguna dalam pelbagai topik kepenggunaan yang luas, merangkumi:
+Tugas utama anda adalah membantu pengguna dalam pelbagai topik kepenggunaan yang luas:
+1. HAK PENGGUNA & ADUAN: Panduan Akta Perlindungan Pengguna, aduan KPDN, Tribunal Tuntutan Pengguna (TTPM), kes scam/NSRC 997.
+2. MAKANAN & KESIHATAN: Cadangan pilihan makanan sihat, semakan isu keselamatan makanan, kesedaran status halal, isu kesihatan am.
+3. ISU PENGGUNA AM: Hak pembeli barangan rosak, isu harga barangan, perbelanjaan berhemat.
 
-1. HAK PENGGUNA & ADUAN: Panduan Akta Perlindungan Pengguna, aduan KPDN, Tribunal Tuntutan Pengguna (TTPM), dan kes scam/NSRC 997.
-2. MAKANAN & KESIHATAN: Cadangan pilihan makanan sihat, semakan isu keselamatan makanan, kesedaran status halal, dan panduan membeli barangan dapur berasaskan kesihatan.
-3. ISU PENGGUNA AM: Hak pembeli barangan rosak, isu harga barangan, dan nasihat perbelanjaan berhemat.
-
-Gaya jawapan:
-- Mesra, profesional, bertatasusila, dan mudah difahami.
-- Memberikan cadangan yang praktikal dan berfakta.
-- Masukkan penafian mesra bahawa nasihat kesihatan atau perundangan adalah untuk rujukan umum sahaja.
+Gaya jawapan mesra, profesional, bertatasusila, praktikal dan berfakta dalam Bahasa Melayu.
 """
 
-# Sejarah Perbualan
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Paparkan mesej lama
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# Input Pengguna
 if user_input := st.chat_input("Tanya soalan anda di sini..."):
     if not api_key:
-        st.error("Sila masukkan Gemini API Key di bahagian menu sisi (sidebar) dahulu!")
+        st.error("Sila masukkan Gemini API Key di bahagian menu sisi dahulu!")
     else:
         st.session_state.messages.append({"role": "user", "content": user_input})
         with st.chat_message("user"):
@@ -46,55 +37,32 @@ if user_input := st.chat_input("Tanya soalan anda di sini..."):
         with st.chat_message("assistant"):
             message_placeholder = st.empty()
             
-            payload = {
-                "model": "gemini-3.7-flash",
-                "system_instruction": SYSTEM_INSTRUCTION.strip(),
-                "input": {
-                    "type": "text",
-                    "text": user_input
-                }
-            }
+            try:
+                client = genai.Client(api_key=api_key.strip())
+                
+                # Format sejarah chat
+                contents = []
+                for m in st.session_state.messages:
+                    role = "user" if m["role"] == "user" else "model"
+                    contents.append(types.Content(role=role, parts=[types.Part.from_text(text=m["content"])]))
 
-            headers = {
-                "Content-Type": "application/json",
-                "x-goog-api-key": api_key.strip()
-            }
-            url = "https://generativelanguage.googleapis.com/v1beta/interactions"
-
-            bot_reply = ""
-            last_error_message = ""
-
-            # Cuba sehingga 4 kali dengan jeda masa bertingkat jika berlaku trafik tinggi (500)
-            for attempt in range(4):
-                try:
-                    response = requests.post(url, headers=headers, json=payload, timeout=30)
-                    data = response.json()
-
-                    if response.status_code == 200:
-                        if "outputs" in data and len(data["outputs"]) > 0:
-                            for output in data["outputs"]:
-                                if output.get("type") == "text" and "text" in output:
-                                    bot_reply += output["text"]
-                                elif "text" in output:
-                                    bot_reply += output["text"]
-                        elif "text" in data:
-                            bot_reply = data["text"]
-
-                        if bot_reply:
-                            break
-                    elif response.status_code in [500, 503]:
-                        # Trafik pelayan tinggi, tunggu sebentar dan cuba semula
-                        time.sleep(2 * (attempt + 1))
-                        continue
-                    else:
-                        last_error_message = data.get("error", {}).get("message", f"Status {response.status_code}")
-                        break
-                except Exception as e:
-                    last_error_message = str(e)
-                    time.sleep(2)
-
-            if bot_reply:
+                # Panggilan model terkini
+                response = client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=contents,
+                    config=types.GenerateContentConfig(
+                        system_instruction=SYSTEM_INSTRUCTION.strip(),
+                        temperature=0.7,
+                    )
+                )
+                
+                bot_reply = response.text
                 message_placeholder.markdown(bot_reply)
                 st.session_state.messages.append({"role": "assistant", "content": bot_reply})
-            else:
-                st.error(f"Gagal memproses permintaan AI: {last_error_message}")
+
+            except Exception as e:
+                err_str = str(e)
+                if "RESOURCE_EXHAUSTED" in err_str or "Quota exceeded" in err_str:
+                    st.warning("⏳ Had kuota percuma penuh buat sementara waktu. Sila tunggu 1 minit atau jana API Key baharu di Google AI Studio.")
+                else:
+                    st.error(f"Ralat sistem: {err_str}")
