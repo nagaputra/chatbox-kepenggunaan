@@ -1,14 +1,16 @@
 import streamlit as st
-import time
 from google import genai
 from google.genai import types
 
+# Tetapan Halaman Web
 st.set_page_config(page_title="Pembantu Kepenggunaan & Gaya Hidup AI", page_icon="🛍️")
 st.title("🛍️ Pembantu Kepenggunaan & Gaya Hidup AI")
 st.write("Tanyakan soalan berkaitan hak pengguna, aduan KPDN/TTPM, cadangan makanan sihat, isu kesihatan, atau penipuan (scam).")
 
+# Input API Key di Sidebar
 api_key = st.sidebar.text_input("Masukkan Gemini API Key:", type="password")
 
+# Peranan & Panduan AI
 SYSTEM_INSTRUCTION = """
 Anda ialah Pembantu AI Kepenggunaan dan Gaya Hidup Pintar di Malaysia.
 Tugas utama anda adalah membantu pengguna dalam pelbagai topik kepenggunaan yang luas:
@@ -19,13 +21,16 @@ Tugas utama anda adalah membantu pengguna dalam pelbagai topik kepenggunaan yang
 Gaya jawapan mesra, profesional, bertatasusila, praktikal dan berfakta dalam Bahasa Melayu.
 """
 
+# Sejarah Perbualan
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+# Paparkan mesej lama
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
+# Input Pengguna
 if user_input := st.chat_input("Tanya soalan anda di sini..."):
     if not api_key:
         st.error("Sila masukkan Gemini API Key di bahagian menu sisi dahulu!")
@@ -40,15 +45,15 @@ if user_input := st.chat_input("Tanya soalan anda di sini..."):
             try:
                 client = genai.Client(api_key=api_key.strip())
                 
-                # Format sejarah chat
+                # Format sejarah perbualan
                 contents = []
                 for m in st.session_state.messages:
                     role = "user" if m["role"] == "user" else "model"
                     contents.append(types.Content(role=role, parts=[types.Part.from_text(text=m["content"])]))
 
-                # Panggilan model terkini
+                # Menggunakan model aktif
                 response = client.models.generate_content(
-                    model="gemini-2.5-flash",
+                    model="gemini-3.7-flash",
                     contents=contents,
                     config=types.GenerateContentConfig(
                         system_instruction=SYSTEM_INSTRUCTION.strip(),
@@ -63,6 +68,6 @@ if user_input := st.chat_input("Tanya soalan anda di sini..."):
             except Exception as e:
                 err_str = str(e)
                 if "RESOURCE_EXHAUSTED" in err_str or "Quota exceeded" in err_str:
-                    st.warning("⏳ Had kuota percuma penuh buat sementara waktu. Sila tunggu 1 minit atau jana API Key baharu di Google AI Studio.")
+                    st.warning("⏳ Had kuota percuma penuh seketika. Sila tunggu 1 minit dan cuba hantar soalan semula.")
                 else:
                     st.error(f"Ralat sistem: {err_str}")
