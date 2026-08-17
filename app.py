@@ -3,7 +3,7 @@ from groq import Groq
 
 # Tetapan Halaman Web
 st.set_page_config(page_title="Pembantu Kepenggunaan & Gaya Hidup AI", page_icon="🛍️")
-st.title("🛍️ Pembantu Kepenggunaan & Gaya Hidup AI")
+st.title("🛍️ SMART AI CHATBOX KEPENGGUNAAN GPS UCAM")
 st.write("Tanyakan soalan berkaitan hak pengguna, aduan KPDN/TTPM, cadangan makanan sihat, isu kesihatan, atau penipuan (scam).")
 
 # Dapatkan API Key daripada Secrets Streamlit
