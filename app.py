@@ -6,7 +6,7 @@ st.set_page_config(page_title="Pembantu Kepenggunaan & Gaya Hidup AI", page_icon
 st.title("🛍️ Pembantu Kepenggunaan & Gaya Hidup AI")
 st.write("Tanyakan soalan berkaitan hak pengguna, aduan KPDN/TTPM, cadangan makanan sihat, isu kesihatan, atau penipuan (scam).")
 
-# Dapatkan API Key daripada Streamlit Secrets
+# Dapatkan API Key daripada Secrets Streamlit
 API_KEY = st.secrets.get("GROQ_API_KEY", "")
 
 # Panduan Sistem & Peranan AI
@@ -51,7 +51,7 @@ if user_input := st.chat_input("Tanya soalan anda di sini..."):
                 for m in st.session_state.messages:
                     messages_payload.append({"role": m["role"], "content": m["content"]})
 
-                # Panggilan model terkini Llama 3.3 70B
+                # Panggilan model Llama 3.3 70B
                 completion = client.chat.completions.create(
                     model="llama-3.3-70b-versatile",
                     messages=messages_payload,
@@ -63,89 +63,4 @@ if user_input := st.chat_input("Tanya soalan anda di sini..."):
                 st.session_state.messages.append({"role": "assistant", "content": bot_reply})
 
             except Exception as e:
-                st.error(f"Ralat sistem: {e}")import streamlit as st
-import requests
-
-# Tetapan Halaman Web
-st.set_page_config(page_title="Pembantu Kepenggunaan & Gaya Hidup AI", page_icon="🛍️")
-st.title("🛍️ Pembantu Kepenggunaan & Gaya Hidup AI")
-st.write("Tanyakan soalan berkaitan hak pengguna, aduan KPDN/TTPM, cadangan makanan sihat, isu kesihatan, atau penipuan (scam).")
-
-# Dapatkan API Key daripada Secrets Streamlit
-API_KEY = st.secrets.get("GEMINI_API_KEY", "")
-
-# Peranan & Panduan AI
-SYSTEM_INSTRUCTION = """
-Anda ialah Pembantu AI Kepenggunaan dan Gaya Hidup Pintar di Malaysia.
-Tugas utama anda adalah membantu pengguna dalam pelbagai topik kepenggunaan yang luas:
-1. HAK PENGGUNA & ADUAN: Panduan Akta Perlindungan Pengguna, aduan KPDN, Tribunal Tuntutan Pengguna (TTPM), kes scam/NSRC 997.
-2. MAKANAN & KESIHATAN: Cadangan pilihan makanan sihat, semakan isu keselamatan makanan, kesedaran status halal, isu kesihatan am.
-3. ISU PENGGUNA AM: Hak pembeli barangan rosak, isu harga barangan, perbelanjaan berhemat.
-
-Gaya jawapan mesra, profesional, bertatasusila, praktikal dan berfakta dalam Bahasa Melayu.
-"""
-
-# Sejarah Perbualan
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-# Paparkan mesej lama
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
-
-# Input Pengguna
-if user_input := st.chat_input("Tanya soalan anda di sini..."):
-    if not API_KEY:
-        st.error("API Key belum disetkan di bahagian Secrets Streamlit.")
-    else:
-        st.session_state.messages.append({"role": "user", "content": user_input})
-        with st.chat_message("user"):
-            st.markdown(user_input)
-
-        with st.chat_message("assistant"):
-            message_placeholder = st.empty()
-            
-            payload = {
-                "model": "gemini-3.7-flash",
-                "system_instruction": SYSTEM_INSTRUCTION.strip(),
-                "input": {
-                    "type": "text",
-                    "text": user_input
-                }
-            }
-
-            headers = {
-                "Content-Type": "application/json",
-                "x-goog-api-key": API_KEY.strip()
-            }
-            url = "https://generativelanguage.googleapis.com/v1beta/interactions"
-
-            try:
-                # Panggilan tunggal tanpa loop berulang
-                response = requests.post(url, headers=headers, json=payload, timeout=30)
-                data = response.json()
-
-                if response.status_code == 200:
-                    bot_reply = ""
-                    if "outputs" in data and len(data["outputs"]) > 0:
-                        for output in data["outputs"]:
-                            if output.get("type") == "text" and "text" in output:
-                                bot_reply += output["text"]
-                            elif "text" in output:
-                                bot_reply += output["text"]
-                    elif "text" in data:
-                        bot_reply = data["text"]
-
-                    if bot_reply:
-                        message_placeholder.markdown(bot_reply)
-                        st.session_state.messages.append({"role": "assistant", "content": bot_reply})
-                    else:
-                        st.write(data)
-                else:
-                    # Paparkan punca sebenar dari Google tanpa tekaan
-                    error_msg = data.get("error", {}).get("message", f"HTTP Error {response.status_code}")
-                    st.error(f"Maklum Balas Pelayan ({response.status_code}): {error_msg}")
-
-            except Exception as e:
-                st.error(f"Ralat Sambungan: {e}")
+                st.error(f"Ralat sistem: {e}")
