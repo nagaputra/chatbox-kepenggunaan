@@ -1,14 +1,13 @@
 import streamlit as st
-from google import genai
-from google.genai import types
+import requests
 
 # Tetapan Halaman Web
 st.set_page_config(page_title="Pembantu Kepenggunaan & Gaya Hidup AI", page_icon="🛍️")
 st.title("🛍️ Pembantu Kepenggunaan & Gaya Hidup AI")
 st.write("Tanyakan soalan berkaitan hak pengguna, aduan KPDN/TTPM, cadangan makanan sihat, isu kesihatan, atau penipuan (scam).")
 
-# Input API Key di Sidebar
-api_key = st.secrets.get("GEMINI_API_KEY", "")
+# Dapatkan API Key daripada Secrets Streamlit
+API_KEY = st.secrets.get("GEMINI_API_KEY", "")
 
 # Peranan & Panduan AI
 SYSTEM_INSTRUCTION = """
@@ -32,8 +31,8 @@ for msg in st.session_state.messages:
 
 # Input Pengguna
 if user_input := st.chat_input("Tanya soalan anda di sini..."):
-    if not api_key:
-        st.error("Sila masukkan Gemini API Key di bahagian menu sisi dahulu!")
+    if not API_KEY:
+        st.error("API Key belum disetkan di bahagian Secrets Streamlit.")
     else:
         st.session_state.messages.append({"role": "user", "content": user_input})
         with st.chat_message("user"):
@@ -42,32 +41,46 @@ if user_input := st.chat_input("Tanya soalan anda di sini..."):
         with st.chat_message("assistant"):
             message_placeholder = st.empty()
             
-            try:
-                client = genai.Client(api_key=api_key.strip())
-                
-                # Format sejarah perbualan
-                contents = []
-                for m in st.session_state.messages:
-                    role = "user" if m["role"] == "user" else "model"
-                    contents.append(types.Content(role=role, parts=[types.Part.from_text(text=m["content"])]))
+            payload = {
+                "model": "gemini-3.7-flash",
+                "system_instruction": SYSTEM_INSTRUCTION.strip(),
+                "input": {
+                    "type": "text",
+                    "text": user_input
+                }
+            }
 
-                # Menggunakan model aktif
-                response = client.models.generate_content(
-                    model="gemini-3.7-flash",
-                    contents=contents,
-                    config=types.GenerateContentConfig(
-                        system_instruction=SYSTEM_INSTRUCTION.strip(),
-                        temperature=0.7,
-                    )
-                )
-                
-                bot_reply = response.text
-                message_placeholder.markdown(bot_reply)
-                st.session_state.messages.append({"role": "assistant", "content": bot_reply})
+            headers = {
+                "Content-Type": "application/json",
+                "x-goog-api-key": API_KEY.strip()
+            }
+            url = "https://generativelanguage.googleapis.com/v1beta/interactions"
+
+            try:
+                # Panggilan tunggal tanpa loop berulang
+                response = requests.post(url, headers=headers, json=payload, timeout=30)
+                data = response.json()
+
+                if response.status_code == 200:
+                    bot_reply = ""
+                    if "outputs" in data and len(data["outputs"]) > 0:
+                        for output in data["outputs"]:
+                            if output.get("type") == "text" and "text" in output:
+                                bot_reply += output["text"]
+                            elif "text" in output:
+                                bot_reply += output["text"]
+                    elif "text" in data:
+                        bot_reply = data["text"]
+
+                    if bot_reply:
+                        message_placeholder.markdown(bot_reply)
+                        st.session_state.messages.append({"role": "assistant", "content": bot_reply})
+                    else:
+                        st.write(data)
+                else:
+                    # Paparkan punca sebenar dari Google tanpa tekaan
+                    error_msg = data.get("error", {}).get("message", f"HTTP Error {response.status_code}")
+                    st.error(f"Maklum Balas Pelayan ({response.status_code}): {error_msg}")
 
             except Exception as e:
-                err_str = str(e)
-                if "RESOURCE_EXHAUSTED" in err_str or "Quota exceeded" in err_str:
-                    st.warning("⏳ Had kuota percuma penuh seketika. Sila tunggu 1 minit dan cuba hantar soalan semula.")
-                else:
-                    st.error(f"Ralat sistem: {err_str}")
+                st.error(f"Ralat Sambungan: {e}")
