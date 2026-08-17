@@ -51,39 +51,35 @@ if user_input := st.chat_input("Tanya soalan anda di sini..."):
             bot_reply = None
             last_error = ""
 
-            # Cuba model secara bergilir jika berlaku trafik sesak
-            candidate_models = ["gemini-3.7-flash", "gemini-2.5-flash"]
-
-            for model_name in candidate_models:
-                for attempt in range(2):
-                    try:
-                        client = genai.Client(api_key=API_KEY.strip())
-                        response = client.models.generate_content(
-                            model=model_name,
-                            contents=contents,
-                            config=types.GenerateContentConfig(
-                                system_instruction=SYSTEM_INSTRUCTION.strip(),
-                                temperature=0.7,
-                            )
+            # Cuba sehingga 4 kali sekiranya server mengalami high demand (503)
+            for attempt in range(4):
+                try:
+                    client = genai.Client(api_key=API_KEY.strip())
+                    response = client.models.generate_content(
+                        model="gemini-3.7-flash",
+                        contents=contents,
+                        config=types.GenerateContentConfig(
+                            system_instruction=SYSTEM_INSTRUCTION.strip(),
+                            temperature=0.7,
                         )
-                        bot_reply = response.text
-                        if bot_reply:
-                            break
-                    except Exception as e:
-                        last_error = str(e)
-                        if "503" in last_error or "UNAVAILABLE" in last_error:
-                            time.sleep(2)
-                            continue
-                        else:
-                            break
-                if bot_reply:
-                    break
+                    )
+                    bot_reply = response.text
+                    if bot_reply:
+                        break
+                except Exception as e:
+                    last_error = str(e)
+                    # Jika pelayan sibuk, tunggu seketika sebelum cuba semula
+                    if any(err_kw in last_error.lower() for err_kw in ["503", "unavailable", "high demand", "overloaded"]):
+                        time.sleep(2.5 * (attempt + 1))
+                        continue
+                    else:
+                        break
 
             if bot_reply:
                 message_placeholder.markdown(bot_reply)
                 st.session_state.messages.append({"role": "assistant", "content": bot_reply})
             else:
                 if "RESOURCE_EXHAUSTED" in last_error or "Quota exceeded" in last_error:
-                    st.warning("⏳ Had kuota seminit penuh. Sila tunggu seketika dan cuba hantar soalan semula.")
+                    st.warning("⏳ Had kuota seminit penuh. Sila tunggu 1 minit dan cuba hantar soalan semula.")
                 else:
                     st.error(f"Ralat sistem: {last_error}")
