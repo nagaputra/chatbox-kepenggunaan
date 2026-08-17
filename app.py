@@ -3,15 +3,12 @@ import time
 from google import genai
 from google.genai import types
 
-# Tetapan Halaman Web
 st.set_page_config(page_title="Pembantu Kepenggunaan & Gaya Hidup AI", page_icon="🛍️")
 st.title("🛍️ Pembantu Kepenggunaan & Gaya Hidup AI")
 st.write("Tanyakan soalan berkaitan hak pengguna, aduan KPDN/TTPM, cadangan makanan sihat, isu kesihatan, atau penipuan (scam).")
 
-# Dapatkan API Key daripada Secrets Streamlit
 API_KEY = st.secrets.get("GEMINI_API_KEY", "")
 
-# Peranan & Panduan AI
 SYSTEM_INSTRUCTION = """
 Anda ialah Pembantu AI Kepenggunaan dan Gaya Hidup Pintar di Malaysia.
 Tugas utama anda adalah membantu pengguna dalam pelbagai topik kepenggunaan yang luas:
@@ -22,16 +19,13 @@ Tugas utama anda adalah membantu pengguna dalam pelbagai topik kepenggunaan yang
 Gaya jawapan mesra, profesional, bertatasusila, praktikal dan berfakta dalam Bahasa Melayu.
 """
 
-# Sejarah Perbualan
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Paparkan mesej lama
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# Input Pengguna
 if user_input := st.chat_input("Tanya soalan anda di sini..."):
     st.session_state.messages.append({"role": "user", "content": user_input})
     with st.chat_message("user"):
@@ -51,12 +45,12 @@ if user_input := st.chat_input("Tanya soalan anda di sini..."):
             bot_reply = None
             last_error = ""
 
-            # Cuba sehingga 4 kali sekiranya server mengalami high demand (503)
-            for attempt in range(4):
+            # Menggunakan alias rasmi 'gemini-flash' untuk kestabilan jangka panjang
+            for attempt in range(3):
                 try:
                     client = genai.Client(api_key=API_KEY.strip())
                     response = client.models.generate_content(
-                        model="gemini-3.7-flash",
+                        model="gemini-flash",
                         contents=contents,
                         config=types.GenerateContentConfig(
                             system_instruction=SYSTEM_INSTRUCTION.strip(),
@@ -68,9 +62,8 @@ if user_input := st.chat_input("Tanya soalan anda di sini..."):
                         break
                 except Exception as e:
                     last_error = str(e)
-                    # Jika pelayan sibuk, tunggu seketika sebelum cuba semula
-                    if any(err_kw in last_error.lower() for err_kw in ["503", "unavailable", "high demand", "overloaded"]):
-                        time.sleep(2.5 * (attempt + 1))
+                    if "503" in last_error or "unavailable" in last_error.lower():
+                        time.sleep(2)
                         continue
                     else:
                         break
@@ -80,6 +73,6 @@ if user_input := st.chat_input("Tanya soalan anda di sini..."):
                 st.session_state.messages.append({"role": "assistant", "content": bot_reply})
             else:
                 if "RESOURCE_EXHAUSTED" in last_error or "Quota exceeded" in last_error:
-                    st.warning("⏳ Had kuota seminit penuh. Sila tunggu 1 minit dan cuba hantar soalan semula.")
+                    st.warning("⏳ Had kuota seminit penuh. Sila tunggu sebentar.")
                 else:
                     st.error(f"Ralat sistem: {last_error}")
