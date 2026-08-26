@@ -137,7 +137,7 @@ def call_groq(messages):
     }
     payload = {
         "model": GROQ_MODEL,
-        "max_tokens": 1000,
+        "max_tokens": 2000,
         "messages": [{"role": "system", "content": SYSTEM_PROMPT}] + messages,
     }
     response = requests.post(
