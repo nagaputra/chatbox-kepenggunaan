@@ -3,7 +3,7 @@ import requests
 
 # ---------- KONFIGURASI HALAMAN ----------
 st.set_page_config(
-    page_title="Tanya Pengguna",
+    page_title="SMART AI CHATBOX KEPENGGUNAAN UCAM",
     page_icon="🧾",
     layout="centered",
 )
@@ -83,8 +83,8 @@ html, body, [class*="css"] {
 # ---------- KEPALA RESIT ----------
 st.markdown("""
 <div class="receipt-header">
-    <div class="eyebrow">Resit Bantuan Rasmi</div>
-    <div class="receipt-title">TANYA PENGGUNA</div>
+    <div class="eyebrow">SMART AI CHATBOX</div>
+    <div class="receipt-title">SMART AI CHATBOX KEPENGGUNAAN UCAM</div>
     <div class="receipt-sub">Sistem AI untuk soalan kepenggunaan, keselamatan makanan, kesihatan am &amp; nasihat harian — hak pengguna, waranti, aduan, penipuan, dan lebih lagi.</div>
 </div>
 """, unsafe_allow_html=True)
@@ -97,7 +97,7 @@ Untuk isu kesihatan serius, jumpa doktor; untuk tuntutan formal, rujuk Tribunal 
 """, unsafe_allow_html=True)
 
 # ---------- SYSTEM PROMPT ----------
-SYSTEM_PROMPT = """Anda ialah "Tanya Pengguna", sistem bantuan AI serba boleh yang membantu pengguna di Malaysia dengan pelbagai soalan harian — bermula daripada asas kepenggunaan (consumer affairs), dan turut merangkumi topik berkaitan seperti keselamatan makanan, kesihatan am, cadangan produk, dan nasihat praktikal harian yang lain.
+SYSTEM_PROMPT = """Anda ialah "SMART AI CHATBOX KEPENGGUNAAN UCAM", sistem bantuan AI serba boleh yang membantu pengguna di Malaysia dengan pelbagai soalan harian — bermula daripada asas kepenggunaan (consumer affairs), dan turut merangkumi topik berkaitan seperti keselamatan makanan, kesihatan am, cadangan produk, dan nasihat praktikal harian yang lain.
 
 BIDANG UTAMA (paling pakar):
 - Hak dan tanggungjawab pengguna di Malaysia, Akta Pelindungan Pengguna 1999 (APP 1999)
